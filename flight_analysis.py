@@ -75,7 +75,6 @@ if __name__ == "__main__":
     # 2. add results to sql database
     # connect to database
     db = Database(db_host=private.DB_HOST, db_name=private.DB_NAME, db_user=private.DB_USER, db_pw=private.DB_PW, db_table=private.DB_TABLE, db_sql=private.DB_SQL)
-    # db = Database(db_host='DESKTOP-QDA8RLP\PERSONALDB', db_name='flight_analysis', db_user='admin', db_pw='password', db_table='scraped', db_sql="mssql")
 
     # prepare database and tables
     db.prepare_db_and_tables(overwrite_table=False)
