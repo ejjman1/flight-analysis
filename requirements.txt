@@ -8,3 +8,5 @@ pymongo
 configparser
 psycopg2-binary
 pyodbc
+requests
+csv

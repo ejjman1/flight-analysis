@@ -21,19 +21,27 @@ class Flight:
         self._dest = None
         self._queried_dest = queried_dest
         self._date = dl
+        self._daysOfWeek = []
+        self._depart_day_leave = None
+        self._depart_day_arrive = None
+        self._depart_time_leave = None
+        self._depart_time_arrive = None
         self._dow = datetime.strptime(dl, '%Y-%m-%d').isoweekday() # day of week
         self._airline = None
         self._flight_time = None
         self._num_stops = None
+        self._return_day_leave = None
+        self._return_day_arrive = None
+        self._return_time_leave = None
+        self._return_time_arrive = None
         self._stops = None
         self._stops_locations = None
         self._co2 = None
         self._emissions = None
         self._price = None
+        self._currency = None
         self._price_trend = price_trend
         self._times = []
-        self._time_leave = None
-        self._time_arrive = None
         self.has_train = False
         self._trash = []
         self._parse_args(*args)
@@ -110,17 +118,45 @@ class Flight:
         return self._price
     
     @property
+    def currency(self):
+        return self._currency
+
+    @property
     def price_trend(self):
         return self._price_trend
 
     @property
-    def time_leave(self):
-        return self._time_leave
+    def depart_time_leave(self):
+        return self._depart_time_leave
 
     @property
-    def time_arrive(self):
-        return self._time_arrive
-    
+    def depart_time_arrive(self):
+        return self._depart_time_arrive
+
+    @property
+    def depart_day_leave(self):
+        return self._depart_day_leave
+
+    @property
+    def depart_day_arrive(self):
+        return self._depart_day_arrive
+
+    @property
+    def return_time_leave(self):
+        return self._return_time_leave
+
+    @property
+    def return_time_arrive(self):
+        return self._return_time_arrive
+
+    @property
+    def return_day_leave(self):
+        return self._return_day_leave
+
+    @property
+    def return_day_arrive(self):
+        return self._return_day_arrive
+
     @property
     def has_train(self):
         return self._has_train
@@ -142,7 +178,7 @@ class Flight:
             
             # handle special cases
             if arg == "Change of airport":
-                self._stops = self._stops_locations = "Change of airport"
+                self._stops = self._stops_locations = ["Change of airport"]
                 return
             elif arg in ["round trip", "Climate friendly"] or arg.startswith("Delayed"):
                 return
@@ -157,6 +193,7 @@ class Flight:
 
                 date_format = "%Y-%m-%d %I:%M%p"
                 self._times += [datetime.strptime(self._date + " " + arg, date_format) + delta]
+                self._daysOfWeek += [(datetime.strptime(self._date + " " + arg, date_format) + delta).strftime("%A")]
 
             # flight time       
             # regex:  3 hr 35 min, 45 min, 5 hr
@@ -166,6 +203,8 @@ class Flight:
             # number of stops
             elif ((arg == "Nonstop") or bool(re.search("\d stop", arg))) and (self._num_stops is None):
                 self._num_stops = (0 if arg == 'Nonstop' else int(arg.split()[0]))
+                if self._num_stops == 0:
+                    self._stops_locations = ['NONSTOP']
 
             # co2 
             elif arg.endswith('CO2') and (self._co2 is None):
@@ -177,10 +216,17 @@ class Flight:
                 emission_val = arg.split()[0]
                 self._emissions = 0 if emission_val == 'Avg' else int(emission_val[:-1])
             
-            # price
+            # price, EUR
             elif arg.replace(',','').isdigit() and (self._price is None):
                 self._price = int(arg.replace(',',''))
-    
+                self._currency = 'EUR'
+
+            # price, USD ($), over 1k has a comma must remove.
+            elif '$' in arg:
+                replaceStr1 = arg.replace('$','')
+                self._price = int(replaceStr1.replace(',',''))
+                self._currency = 'USD'
+
             # origin/dest        
             elif (len(arg) == 6 and arg.isupper() or "Flight + Train" in arg) and (self._origin is None) and (self._dest is None):
                 if "Flight + Train" in arg:
@@ -198,14 +244,17 @@ class Flight:
                 if "," in arg: # multiple stops
                     self._stops_locations = arg
                 else: # single stop
-                    self._stops_locations = arg.split(" ")[-1]
+                    self._stops_locations = [arg.split(" ")[-1]]
                     
                 # get stops time
                 if "," in arg:
                     self._stops = arg.split(", ")[0]
                 else:
                     self._stops = re.search("([0-9]+ hr )?([0-9]+ min )?", arg).group().strip()
-                    
+            
+            # check for 2 stops condition. Will have 2 stops and won't be change of airport
+            elif (self._num_stops == 2 and self._stops != "Change of airport" and ',' in arg):
+                self._stops_locations = arg.split(", ")
             
             # airline
             elif len(arg) > 0 and (self._airline is None):
@@ -228,8 +277,10 @@ class Flight:
                 
             # if we have both arrival and departure time, set them
             if len(self._times) == 2:
-                self._time_leave = self._times[0]
-                self._time_arrive = self._times[1]
+                self._depart_time_leave = self._times[0]
+                self._depart_time_arrive = self._times[1]
+                self._depart_day_leave = self._daysOfWeek[0]
+                self._depart_day_arrive = self._daysOfWeek[1]
         
     def _parse_args(self, args):
         for arg in args:
@@ -246,7 +297,7 @@ class Flight:
         if s is None:
             return None
         
-        if not bool(re.search("hr|min", str(s))):
+        if not bool(re.search("hr|min", str(s))) and ('Change' not in s[0]):
             raise ValueError("Invalid duration string:", s)
         
         h = 0
@@ -266,8 +317,14 @@ class Flight:
         Generate a dataframe from lists of flight data
         """
         data = {
-            'departure_datetime': [],
-            'arrival_datetime': [],
+            'depart_departure_datetime': [],
+            'depart_departure_day': [],
+            'depart_arrival_datetime': [],
+            'depart_arrival_day': [],
+            'return_departure_datetime': [],
+            'return_departure_day': [],
+            'return_arrival_datetime': [],
+            'return_arrival_day': [],
             'airlines' : [],
             'travel_time' : [],
             'origin' : [],
@@ -275,7 +332,8 @@ class Flight:
             'layover_n' : [],
             'layover_time' : [],
             'layover_location' : [],
-            'price_eur' : [],
+            'price' : [],
+            'price_currency' : [],
             'price_trend' : [],
             'price_value' : [],
             'access_date' : [],
@@ -284,8 +342,14 @@ class Flight:
         }
 
         for flight in flights:
-            data['departure_datetime'] += [flight.time_leave]
-            data['arrival_datetime'] += [flight.time_arrive]
+            data['depart_departure_datetime'] += [flight.depart_time_leave]
+            data['depart_departure_day'] += [flight.depart_day_leave]
+            data['depart_arrival_datetime'] += [flight.depart_time_arrive]
+            data['depart_arrival_day'] += [flight.depart_day_arrive]
+            data['return_departure_datetime'] += [flight.return_time_leave]
+            data['return_departure_day'] += [flight.return_day_leave]
+            data['return_arrival_datetime'] += [flight.return_time_arrive]
+            data['return_arrival_day'] += [flight.return_day_arrive]
             data['airlines'] += [flight.airline]
             data['travel_time'] += [flight.flight_time]
             data['origin'] += [flight.origin]
@@ -293,7 +357,8 @@ class Flight:
             data['layover_n'] += [flight.num_stops]
             data['layover_time'] += [flight.stops]
             data['layover_location'] += [flight.stops_locations]
-            data['price_eur'] += [flight.price]
+            data['price'] += [flight.price]
+            data['price_currency'] += [flight.currency]
             data["price_trend"] += [flight.price_trend[0]]
             data["price_value"] += [flight.price_trend[1]]
             data['access_date'] += [datetime.today()]
@@ -309,7 +374,7 @@ class Flight:
         df['layover_time'] = df['layover_time'].apply(lambda x: Flight.get_duration_in_minutes_from_string(x))
         
         # add column: Days in Advance
-        df['days_advance'] = (df['departure_datetime'] - df['access_date']).dt.days
+        df['days_advance'] = (df['depart_departure_datetime'] - df['access_date']).dt.days
         
         return df
     

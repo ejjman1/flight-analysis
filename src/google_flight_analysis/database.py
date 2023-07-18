@@ -110,12 +110,19 @@ class Database:
                 query += "USE flight_analysis; IF OBJECT_ID('scraped', 'U') IS NOT NULL DROP TABLE scraped;\n"
 
         if self.db_sql == 'postgre':
+            # TODO this query needs tested.
             query += """
                 CREATE TABLE IF NOT EXISTS public.scraped
                 (
                     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-                    departure_datetime timestamp with time zone,
-                    arrival_datetime timestamp with time zone,
+                    depart_departure_datetime timestamp with time zone,
+                    depart_departure_day text COLLATE pg_catalog."default",
+                    depart_arrival_datetime timestamp with time zone,
+                    depart_arrival_day text COLLATE pg_catalog."default",
+                    return_departure_datetime timestamp with time zone,
+                    return_departure_day text COLLATE pg_catalog."default",
+                    return_arrival_datetime timestamp with time zone,
+                    return_arrival_day text COLLATE pg_catalog."default",
                     airlines text[] COLLATE pg_catalog."default",
                     travel_time smallint NOT NULL,
                     origin character(3) COLLATE pg_catalog."default"  NOT NULL,
@@ -123,7 +130,8 @@ class Database:
                     layover_n smallint NOT NULL,
                     layover_time numeric,
                     layover_location text COLLATE pg_catalog."default",
-                    price_eur smallint NOT NULL,
+                    price smallint,
+                    price_currency text COLLATE pg_catalog."default",
                     price_trend text COLLATE pg_catalog."default",
                     price_value text COLLATE pg_catalog."default",
                     access_date timestamp with time zone NOT NULL,
@@ -142,8 +150,14 @@ class Database:
                 CREATE TABLE scraped
                 (
                     id uniqueidentifier DEFAULT NEWID() PRIMARY KEY,
-                    departure_datetime datetimeoffset,
-                    arrival_datetime datetimeoffset,
+                    depart_departure_datetime datetime2(0),
+                    depart_departure_day varchar(max),
+                    depart_arrival_datetime datetime2(0),
+                    depart_arrival_day varchar(max),
+                    return_departure_datetime datetime2(0),
+                    return_departure_day varchar(max),
+                    return_arrival_datetime datetime2(0),
+                    return_arrival_day varchar(max),
                     airlines varchar(max),
                     travel_time smallint NOT NULL,
                     origin char(3) NOT NULL,
@@ -151,7 +165,8 @@ class Database:
                     layover_n smallint NOT NULL,
                     layover_time decimal(18, 2),
                     layover_location varchar(max),
-                    price_eur smallint NOT NULL,
+                    price smallint,
+                    price_currency varchar(max),
                     price_trend varchar(max),
                     price_value varchar(max),
                     access_date datetimeoffset NOT NULL,
@@ -183,9 +198,9 @@ class Database:
         Some necessary cleaning and transforming operations to the df
         before sending its content to the database
         """
-
         df["airlines"] = df.airlines.apply(lambda x: np.array(ast.literal_eval(str(x).replace("[", '"{').replace("]", '}"'))))
-        df['layover_time'] = df['layover_time'].fillna(-1)
+        df["layover_location"] = df.layover_location.apply(lambda x: np.array(ast.literal_eval(str(x).replace("[", '"{').replace("]", '}"'))))
+        df['layover_time'] = df['layover_time'].fillna(np.nan).replace([np.nan], [None])
         df["layover_location"] = df["layover_location"].fillna(np.nan).replace([np.nan], [None])
         df["price_value"] = df["price_value"].fillna(np.nan).replace([np.nan], [None])
 
@@ -216,16 +231,17 @@ class Database:
             logger.info("{} rows added to table [{}]".format(len(df), self.db_table))
             cursor.close()
         else:
-            query = f"INSERT INTO {self.db_table}({cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            query = f"INSERT INTO {self.db_table}({cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             try:
                 cursor.executemany(query, tuples)
+                logger.info("{} rows added to table [{}]".format(len(df), self.db_table))
             except (Exception, pyodbc.DatabaseError) as error:
                 logger.error("Error: %s" % error)
                 self.conn.rollback()
-                cursor.close()
-            
-            logger.info("{} rows added to table [{}]".format(len(df), self.db_table))
+
             cursor.close()
+            
+
 
         
         # # fix layover time

@@ -2,6 +2,8 @@ import os
 import logging
 import logging.config
 import json
+import requests #Airport codes eventually
+import csv #Airport codes eventually
 
 # logging
 LOGS_PATH = os.path.join(os.path.dirname(__file__), "logs")
@@ -55,3 +57,30 @@ def get_routes_from_config(config_obj):
         routes.append(json.loads(config_obj["routes"][route]))
 
     return routes
+
+
+# TODO: I want to do something with these codes. Not sure what yet...
+def updateAirportCodes(pullNewData=True):
+    
+    if pullNewData:
+        # Step 1: Pull data from the URL
+        url = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
+        response = requests.get(url)
+        data = response.text
+
+        # Step 2: Save data to a local CSV file
+        filename = "airport_data.csv"
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            lines = data.split('\n')
+            for line in lines:
+                writer.writerow(line.split(','))
+
+    # Step 3: Load data from the CSV file
+    airport_data = []
+    with open(filename, 'r', encoding='utf-8') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            airport_data.append([row[3], row[4]])
+    
+    return airport_data
