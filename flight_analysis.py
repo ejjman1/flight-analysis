@@ -11,6 +11,7 @@ import csv
 import numpy as np
 import pandas as pd
 from datetime import timedelta, datetime
+from utils import checkRoutes
 import configparser
 
 from src.google_flight_analysis.scrape import Scrape
@@ -24,24 +25,16 @@ config.read(os.path.join(os.path.dirname(__file__), "config.ini"))
 
 if __name__ == "__main__":
 
-    # Use Target Date w Flexible Range in config.ini (NEW)
-    newMethod = True
-
-    # Use depart/return, and flexible days in config.ini (NEW NEW)
-    newNewMethod = False
-
-    # Both false, use Date Range in config.ini (OLD)
-
     # TODO: feed this information in somehow else.
     ourCountry = 'US'
     ourCurrency = 'USD'
 
-    if newMethod and newNewMethod:
-        raise ValueError("Select only one new method.")
-
     # 1. scrape routes
     routes = utils.get_routes_from_config(config)
-    
+
+    # verify config.ini formats
+    newMethod, newNewMethod = checkRoutes(routes)
+
     # TODO: find usage for airportData?
     # airportData = utils.updateAirportCodes(True)
 
@@ -163,10 +156,15 @@ if __name__ == "__main__":
     all_results_df = pd.concat(all_results)
 
     # save to csv so we don't keep re-running
-    # all_results_df.to_csv('flight-analysis/flight-analysis/dataframe.csv', index=False)
+    # if newNewMethod:
+    #     all_results_df.to_csv('flight-analysis/flight-analysis/assets/dataframe_roundtrip.csv', index=False)
+    # else:
+    #     all_results_df.to_csv('flight-analysis/flight-analysis/assets/dataframe_oneway.csv', index=False)
+
 
     # grab our csv so we don't keep polling
-    # all_results_df = pd.read_csv('flight-analysis/flight-analysis/dataframe.csv')
+    # TODO need to choose to load oneway or round trip someway.
+    # all_results_df = pd.read_csv('flight-analysis/flight-analysis/assets/dataframe_oneway.csv')
 
     # 2. add results to sql database
     # connect to database

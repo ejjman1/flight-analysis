@@ -129,9 +129,10 @@ class Scrape:
     def create_driver(self):
         options = Options()
         options.add_argument('--no-sandbox')
-        #options.add_argument('--headless')
+        options.add_argument('--headless')
         # otherwise data such as layover location and emissions is not displayed
         options.add_argument("--window-size=1920,1080")
+        options.add_argument("--incognito")
         # options.add_argument('--disable-dev-shm-usage')
         driver = webdriver.Chrome(service=Service(
             ChromeDriverManager().install()), options=options)
@@ -337,7 +338,7 @@ class Scrape:
             how_cheap = 0
             numeric_value = ''.join([char for char in s if char.isdigit()])
             if numeric_value:
-                how_cheap = int(numeric_value)
+                how_cheap = str(numeric_value)
 
             return ("low", how_cheap)
 
@@ -389,8 +390,7 @@ class Scrape:
                 lambda d: len(Scrape._get_flight_elements(d)) > 250)
         else:
             WebDriverWait(driver, timeout).until(
-                # lambda d: len(Scrape._get_flight_elements(d)) > 40)
-                lambda d: 'Help Center' in Scrape._get_flight_elements(d))
+                lambda d: len(Scrape._get_flight_elements(d)) > 40)
 
         results = Scrape._get_flight_elements(driver)
 

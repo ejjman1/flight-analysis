@@ -19,6 +19,8 @@ temp.ipynb
 main.ipynb
 simulate_data.ipynb
 dataframe.csv
+dataframe_oneway.csv
+dataframe_roundtrip.csv
 
 # logging
 logs/

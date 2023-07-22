@@ -84,3 +84,31 @@ def updateAirportCodes(pullNewData=True):
             airport_data.append([row[3], row[4]])
     
     return airport_data
+
+
+# A quick check on config.ini formats. Not perfect but will catch most.
+def checkRoutes(routes):
+    om=0
+    nm=0
+    nnm=0
+    count = len(routes)
+    for i in routes:
+        #if we find something NOt an int, we know it's not the old method.
+        if not (isinstance(i[2], int)):
+            # check next slot which would be. If not there, it must be round trip.
+            if not (isinstance(i[3], int)):
+                if not (isinstance(i[4], int)):
+                    raise ValueError("Something wrong with config.ini")
+                nnm+=1
+                continue
+            nm+=1
+            continue
+        om+=1
+    if om==count:
+        return False, False
+    elif nm==count:
+        return True, False
+    elif nnm==count:
+        return False, True
+    else:
+        raise ValueError("There's something wrong with config.ini")

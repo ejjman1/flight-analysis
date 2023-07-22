@@ -226,6 +226,11 @@ class Flight:
                 replaceStr1 = arg.replace('$','')
                 self._price = int(replaceStr1.replace(',',''))
                 self._currency = 'USD'
+            
+            # Southwest does not have a price
+            elif arg == "Price unavailable":
+                self._price = 0
+                self._currency = 'USD'
 
             # origin/dest        
             elif (len(arg) == 6 and arg.isupper() or "Flight + Train" in arg) and (self._origin is None) and (self._dest is None):
